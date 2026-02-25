@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import './App.css'
 
 function App() {
@@ -19,31 +19,45 @@ function App() {
   const [criteria, setCriteria] = useState(initialCriteria)
   const [newCriteriaName, setNewCriteriaName] = useState('')
 
-  // Calculate weighted scores
-  const calculateScores = () => {
+  const analysis = useMemo(() => {
     const scores = { A: 0, B: 0, I: 0, N: 0 }
+    const contributors = { A: [], B: [], I: [], N: [] }
     let totalWeight = 0
 
     criteria.forEach(criterion => {
       totalWeight += criterion.weight
       locations.forEach(loc => {
-        scores[loc] += criterion.weight * criterion.scores[loc]
+        const contribution = criterion.weight * criterion.scores[loc]
+        scores[loc] += contribution
+        contributors[loc].push({
+          name: criterion.name,
+          contribution: contribution,
+          weight: criterion.weight,
+          score: criterion.scores[loc]
+        })
       })
     })
 
-    return { scores, totalWeight }
-  }
+    const topContributors = {}
+    locations.forEach(loc => {
+      topContributors[loc] = contributors[loc]
+        .sort((a, b) => b.contribution - a.contribution)
+        .slice(0, 2)
+    })
 
-  const { scores: weightedScores, totalWeight } = calculateScores()
+    const sortedLocations = locations.sort((a, b) => scores[b] - scores[a])
+    const bestLocation = sortedLocations[0]
+    const worstLocation = sortedLocations[sortedLocations.length - 1]
 
-  // Update weight
+    return { scores, totalWeight, topContributors, bestLocation, worstLocation }
+  }, [criteria])
+
   const updateWeight = (id, newWeight) => {
     setCriteria(criteria.map(c => 
       c.id === id ? { ...c, weight: Math.max(0, newWeight) } : c
     ))
   }
 
-  // Update score for a location
   const updateScore = (id, location, newScore) => {
     setCriteria(criteria.map(c => 
       c.id === id 
@@ -52,7 +66,6 @@ function App() {
     ))
   }
 
-  // Add new criterion
   const addCriterion = () => {
     if (newCriteriaName.trim()) {
       const newId = Math.max(...criteria.map(c => c.id), 0) + 1
@@ -66,12 +79,10 @@ function App() {
     }
   }
 
-  // Remove criterion
   const removeCriterion = (id) => {
     setCriteria(criteria.filter(c => c.id !== id))
   }
 
-  // Reset to initial
   const resetToInitial = () => {
     setCriteria(initialCriteria)
   }
@@ -80,32 +91,65 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>📍 Location Decision Matrix</h1>
-        <p>Adjust weights and scores to find your best location match</p>
+        <p>Compare locations based on what matters most to you</p>
       </header>
 
       <div className="container">
-        {/* Scores Summary */}
         <div className="scores-summary">
-          <h2>Weighted Scores</h2>
+          <h2>Location Scores</h2>
           <div className="score-cards">
-            {locations.map(loc => (
-              <div key={loc} className="score-card">
-                <div className="location-letter">{loc}</div>
-                <div className="score-value">{weightedScores[loc].toFixed(0)}</div>
-                <div className="score-bar">
-                  <div 
-                    className="score-fill" 
-                    style={{ width: `${(weightedScores[loc] / (totalWeight * 5)) * 100}%` }}
-                  ></div>
+            {locations.map(loc => {
+              const score = analysis.scores[loc]
+              const maxScore = analysis.totalWeight * 5
+              const percentage = (score / maxScore) * 100
+              const isBest = loc === analysis.bestLocation
+              const isWorst = loc === analysis.worstLocation
+
+              return (
+                <div 
+                  key={loc} 
+                  className={`score-card ${isBest ? 'best' : ''} ${isWorst ? 'worst' : ''}`}
+                >
+                  <div className="card-header">
+                    <div className="location-letter">{loc}</div>
+                    {isBest && <span className="badge best-badge">🏆 Best Match</span>}
+                  </div>
+
+                  <div className="score-value">{score.toFixed(0)}</div>
+                  
+                  <div className="score-bar">
+                    <div 
+                      className="score-fill" 
+                      style={{ width: `${percentage}%` }}
+                    ></div>
+                  </div>
+
+                  <div className="top-contributors">
+                    <div className="contributors-label">Top factors:</div>
+                    {analysis.topContributors[loc].length > 0 ? (
+                      <ul className="contributors-list">
+                        {analysis.topContributors[loc].map((contrib, idx) => (
+                          <li key={idx} className="contributor-item">
+                            <span className="contributor-name">{contrib.name}</span>
+                            <span className="contributor-value">+{contrib.contribution.toFixed(0)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="no-contributors">No data</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
-        {/* Criteria Matrix */}
         <div className="matrix-section">
-          <h2>Decision Criteria</h2>
+          <div className="matrix-header">
+            <h2>Decision Criteria</h2>
+            <span className="criteria-count">{criteria.length} criteria</span>
+          </div>
           <div className="criteria-list">
             {criteria.map(criterion => (
               <div key={criterion.id} className="criterion-row">
@@ -171,7 +215,6 @@ function App() {
           </div>
         </div>
 
-        {/* Add New Criterion */}
         <div className="add-criterion">
           <h3>Add New Criterion</h3>
           <div className="input-group">
@@ -187,7 +230,6 @@ function App() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="actions">
           <button onClick={resetToInitial} className="reset-btn">Reset to Original</button>
         </div>
