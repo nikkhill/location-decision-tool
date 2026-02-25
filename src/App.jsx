@@ -18,6 +18,7 @@ function App() {
   const locations = ['A', 'B', 'I', 'N']
   const [criteria, setCriteria] = useState(initialCriteria)
   const [newCriteriaName, setNewCriteriaName] = useState('')
+  const [expandedCriteria, setExpandedCriteria] = useState(null)
 
   const analysis = useMemo(() => {
     const scores = { A: 0, B: 0, I: 0, N: 0 }
@@ -45,11 +46,10 @@ function App() {
         .slice(0, 2)
     })
 
-    const sortedLocations = locations.sort((a, b) => scores[b] - scores[a])
+    const sortedLocations = [...locations].sort((a, b) => scores[b] - scores[a])
     const bestLocation = sortedLocations[0]
-    const worstLocation = sortedLocations[sortedLocations.length - 1]
 
-    return { scores, totalWeight, topContributors, bestLocation, worstLocation }
+    return { scores, totalWeight, topContributors, bestLocation }
   }, [criteria])
 
   const updateWeight = (id, newWeight) => {
@@ -90,149 +90,132 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>📍 Location Decision Matrix</h1>
-        <p>Compare locations based on what matters most to you</p>
+        <h1>📍 Decision Matrix</h1>
+        <p>Find your best location match</p>
       </header>
 
       <div className="container">
-        <div className="scores-summary">
-          <h2>Location Scores</h2>
+        {/* Scores Summary - Compact Cards */}
+        <section className="scores-section">
+          <h2>Scores</h2>
           <div className="score-cards">
             {locations.map(loc => {
               const score = analysis.scores[loc]
               const maxScore = analysis.totalWeight * 5
               const percentage = (score / maxScore) * 100
               const isBest = loc === analysis.bestLocation
-              const isWorst = loc === analysis.worstLocation
 
               return (
                 <div 
                   key={loc} 
-                  className={`score-card ${isBest ? 'best' : ''} ${isWorst ? 'worst' : ''}`}
+                  className={`score-card ${isBest ? 'best' : ''}`}
                 >
-                  <div className="card-header">
-                    <div className="location-letter">{loc}</div>
-                    {isBest && <span className="badge best-badge">🏆 Best Match</span>}
-                  </div>
-
-                  <div className="score-value">{score.toFixed(0)}</div>
-                  
+                  <div className="score-location">{loc}</div>
+                  <div className="score-number">{score.toFixed(0)}</div>
                   <div className="score-bar">
-                    <div 
-                      className="score-fill" 
-                      style={{ width: `${percentage}%` }}
-                    ></div>
+                    <div className="score-fill" style={{ width: `${percentage}%` }}></div>
                   </div>
-
-                  <div className="top-contributors">
-                    <div className="contributors-label">Top factors:</div>
-                    {analysis.topContributors[loc].length > 0 ? (
-                      <ul className="contributors-list">
-                        {analysis.topContributors[loc].map((contrib, idx) => (
-                          <li key={idx} className="contributor-item">
-                            <span className="contributor-name">{contrib.name}</span>
-                            <span className="contributor-value">+{contrib.contribution.toFixed(0)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="no-contributors">No data</p>
-                    )}
+                  {isBest && <div className="best-label">Best</div>}
+                  
+                  <div className="top-factors">
+                    {analysis.topContributors[loc].map((contrib, idx) => (
+                      <div key={idx} className="factor">
+                        <span className="factor-name">{contrib.name}</span>
+                        <span className="factor-value">+{contrib.contribution.toFixed(0)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )
             })}
           </div>
-        </div>
+        </section>
 
-        <div className="matrix-section">
-          <div className="matrix-header">
-            <h2>Decision Criteria</h2>
-            <span className="criteria-count">{criteria.length} criteria</span>
+        {/* Criteria List - Accordion Style */}
+        <section className="criteria-section">
+          <div className="section-header">
+            <h2>Criteria ({criteria.length})</h2>
+            <button className="reset-btn" onClick={resetToInitial}>Reset</button>
           </div>
+          
           <div className="criteria-list">
             {criteria.map(criterion => (
-              <div key={criterion.id} className="criterion-row">
-                <div className="criterion-name">
-                  <input 
-                    type="text" 
-                    value={criterion.name}
-                    onChange={(e) => {
-                      setCriteria(criteria.map(c => 
-                        c.id === criterion.id ? { ...c, name: e.target.value } : c
-                      ))
-                    }}
-                    className="name-input"
-                  />
+              <div 
+                key={criterion.id} 
+                className={`criterion-card ${expandedCriteria === criterion.id ? 'expanded' : ''}`}
+              >
+                <div 
+                  className="criterion-header"
+                  onClick={() => setExpandedCriteria(expandedCriteria === criterion.id ? null : criterion.id)}
+                >
+                  <div className="criterion-title">
+                    <span className="criterion-name">{criterion.name}</span>
+                    <span className="criterion-weight">Weight: {criterion.weight}</span>
+                  </div>
                   <button 
-                    onClick={() => removeCriterion(criterion.id)}
-                    className="remove-btn"
-                    title="Remove criterion"
+                    className="expand-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeCriterion(criterion.id)
+                    }}
+                    title="Remove"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="weight-control">
-                  <label>Weight</label>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="20" 
-                    value={criterion.weight}
-                    onChange={(e) => updateWeight(criterion.id, parseInt(e.target.value))}
-                    className="slider"
-                  />
-                  <span className="weight-value">{criterion.weight}</span>
-                </div>
-
-                <div className="scores-row">
-                  {locations.map(loc => (
-                    <div key={loc} className="score-control">
-                      <label>{loc}</label>
+                {expandedCriteria === criterion.id && (
+                  <div className="criterion-content">
+                    <div className="weight-slider">
+                      <label>Importance</label>
                       <input 
                         type="range" 
                         min="0" 
-                        max="5" 
-                        value={criterion.scores[loc]}
-                        onChange={(e) => updateScore(criterion.id, loc, parseInt(e.target.value))}
+                        max="20" 
+                        value={criterion.weight}
+                        onChange={(e) => updateWeight(criterion.id, parseInt(e.target.value))}
                         className="slider"
                       />
-                      <span className="score-display">{criterion.scores[loc]}</span>
+                      <span className="value">{criterion.weight}</span>
                     </div>
-                  ))}
-                </div>
 
-                <div className="weighted-scores">
-                  {locations.map(loc => (
-                    <div key={loc} className="weighted-score">
-                      <small>{(criterion.weight * criterion.scores[loc]).toFixed(0)}</small>
+                    <div className="scores-grid">
+                      {locations.map(loc => (
+                        <div key={loc} className="score-input">
+                          <label>{loc}</label>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="5" 
+                            value={criterion.scores[loc]}
+                            onChange={(e) => updateScore(criterion.id, loc, parseInt(e.target.value))}
+                            className="slider"
+                          />
+                          <span className="value">{criterion.scores[loc]}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div className="add-criterion">
-          <h3>Add New Criterion</h3>
+        {/* Add Criterion */}
+        <section className="add-section">
           <div className="input-group">
             <input 
               type="text"
               value={newCriteriaName}
               onChange={(e) => setNewCriteriaName(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && addCriterion()}
-              placeholder="Enter criterion name..."
+              placeholder="Add new criterion..."
               className="criterion-input"
             />
-            <button onClick={addCriterion} className="add-btn">Add</button>
+            <button onClick={addCriterion} className="add-btn">+</button>
           </div>
-        </div>
-
-        <div className="actions">
-          <button onClick={resetToInitial} className="reset-btn">Reset to Original</button>
-        </div>
+        </section>
       </div>
     </div>
   )
