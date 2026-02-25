@@ -25,6 +25,8 @@
 
 html, body, #root {
   height: 100%;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -38,6 +40,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 /* Header */
@@ -64,9 +67,8 @@ body {
 .container {
   flex: 1;
   padding: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
   width: 100%;
+  max-width: 100%;
 }
 
 /* Scores Section */
